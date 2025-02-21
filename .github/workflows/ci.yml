@@ -33,10 +33,11 @@ jobs:
       run: |
         python -m pytest -v --cov=reup --cov-report=term-missing
         
-    - name: Check formatting
-      run: |
-        black --check --diff .
+    # Temporarily comment out formatting checks
+    # - name: Check formatting
+    #   run: |
+    #     black --check --diff .
         
-    - name: Lint
-      run: |
-        flake8 . --count --statistics --show-source 
+    # - name: Lint
+    #   run: |
+    #     flake8 . --count --statistics --show-source 

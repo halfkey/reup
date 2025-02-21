@@ -19,14 +19,14 @@ setup(
         ],
     },
     extras_require={
-        'test': [
-            'pytest>=6.0',
-            'pytest-cov>=4.1.0',
-            'pytest-timeout>=2.1.0',
-            'pytest-mock>=3.10.0',
-            'pytest-asyncio>=0.21.0',
-            'black>=23.0.0',
-            'flake8>=6.0.0'
+        "test": [
+            "pytest>=6.0",
+            "pytest-cov>=4.1.0",
+            "pytest-timeout>=2.1.0",
+            "pytest-mock>=3.10.0",
+            "pytest-asyncio>=0.21.0",
+            "black>=23.0.0",
+            "flake8>=6.0.0",
         ]
     },
     classifiers=[
@@ -40,4 +40,4 @@ setup(
         "Programming Language :: Python :: 3.10",
     ],
     python_requires=">=3.8",
-) 
+)
