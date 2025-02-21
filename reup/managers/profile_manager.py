@@ -6,6 +6,7 @@ from ..utils.exceptions import ProfileLoadError, ProfileSaveError, ValidationErr
 from ..utils.helpers import get_timestamp
 import re
 from ..utils.logger import log_security_event
+from typing import Dict
 
 class ProfileManager:
     MAX_PROFILE_NAME_LENGTH = 50
@@ -37,24 +38,24 @@ class ProfileManager:
             
         return name
 
-    def _validate_profile_data(self, data: dict):
+    def _validate_profile_data(self, data: Dict) -> None:
         """Validate profile data structure."""
         if not isinstance(data, dict):
             raise ValidationError("Profile data must be a dictionary")
-            
-        products = data.get('products', [])
-        if not isinstance(products, list):
+        
+        if 'products' not in data:
+            raise ValidationError("Profile must contain products")
+        
+        if not isinstance(data['products'], list):
             raise ValidationError("Products must be a list")
-            
-        if len(products) > self.MAX_PRODUCTS_PER_PROFILE:
-            raise ValidationError(f"Profile cannot contain more than {self.MAX_PRODUCTS_PER_PROFILE} products")
-            
-        # Validate each product URL
-        for url in products:
-            if not isinstance(url, str):
+        
+        for product in data['products']:
+            if not isinstance(product, dict):
+                raise ValidationError("Each product must be a dictionary")
+            if 'url' not in product:
+                raise ValidationError("Each product must have a URL")
+            if not isinstance(product['url'], str):
                 raise ValidationError("Product URLs must be strings")
-            if not url.startswith(('http://', 'https://')):
-                raise ValidationError("Invalid product URL")
 
     def list_profiles(self) -> list:
         """Get list of profile names."""

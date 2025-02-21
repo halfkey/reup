@@ -5,18 +5,26 @@ from tkinter import ttk
 from ..config.constants import DEFAULT_INTERVAL, MIN_INTERVAL
 from ..config.styles import STYLES
 from ..utils.helpers import check_stock, get_timestamp, parse_url
-from ..utils.exceptions import StockCheckError, APIError, URLError
+from ..utils.exceptions import StockCheckError, APIError, URLError, URLParseError
 from plyer import notification
 
 class ProductMonitor(BaseMonitor):
-    def __init__(self, notebook, url, parent):
-        # Pass both notebook and parent as main_app to BaseMonitor
-        super().__init__(notebook, parent)  # parent will serve as main_app
-        self.notebook = notebook
+    """Monitor a single product."""
+    
+    def __init__(self, notebook, url, parent, test_mode=False):
+        """Initialize the monitor."""
+        super().__init__(notebook, parent, test_mode=test_mode)
         self.url = url
-        self.parent = parent
+        self.test_mode = test_mode
         self.scheduled_check = None
         self.paused = False
+        self.status = {
+            'last_check': None,
+            'last_status': None,
+            'error_count': 0
+        }
+        if not test_mode:
+            self.setup_ui()
         
         # Initialize UI components as None
         self.interval_entry = None
@@ -24,16 +32,6 @@ class ProductMonitor(BaseMonitor):
         self.start_button = None
         self.pause_button = None
         self.log_display = None
-        
-        # Create UI
-        self.setup_ui()
-        
-        # Initialize monitoring status
-        self.status = {
-            'last_check': None,
-            'last_status': None,
-            'error_count': 0
-        }
 
     def setup_ui(self):
         """Initialize the UI components."""
@@ -147,17 +145,15 @@ class ProductMonitor(BaseMonitor):
             self.use_default_interval()
             self.monitor_product()
 
-    def validate_interval(self):
-        """Validate the interval value."""
+    def validate_interval(self) -> int:
+        """Validate and return the check interval."""
         try:
             interval = int(self.interval_entry.get())
             if interval < MIN_INTERVAL:
-                raise ValueError(f"Interval must be at least {MIN_INTERVAL} seconds")
+                return MIN_INTERVAL
             return interval
-        except ValueError as e:
-            if "invalid literal" in str(e):
-                raise ValueError("Invalid interval")
-            raise
+        except ValueError:
+            return DEFAULT_INTERVAL
 
     def use_default_interval(self):
         """Reset to default interval."""
@@ -165,40 +161,15 @@ class ProductMonitor(BaseMonitor):
         self.interval_entry.insert(0, str(DEFAULT_INTERVAL))
 
     def monitor_product(self):
-        """Check product stock status."""
-        if self.paused:
-            return
-            
+        """Monitor product stock status."""
+        print("Starting monitor_product check...")
         try:
-            print("Starting monitor_product check...")
             success, name, status = self.check_stock()
-            
-            if success and status:
-                self.handle_stock_status(success, name, status)
-                
-                # Update status in main window's product tree
-                if hasattr(self.parent, 'product_tree'):
-                    for item in self.parent.product_tree.get_children():
-                        values = self.parent.product_tree.item(item)['values']
-                        if values[1] == self.url:  # Match URL
-                            self.parent.product_tree.item(item, values=(
-                                name,
-                                self.url,
-                                status.get('status', 'Unknown'),
-                                '⏹',  # Stop button
-                                '🛒 Add to Cart' if status.get('purchasable') == 'Yes' else ''
-                            ))
-                            break
-                
             # Schedule next check
             interval = self.validate_interval() * 1000  # Convert to milliseconds
             self.scheduled_check = self.after(interval, self.monitor_product)
-            
         except Exception as e:
-            self.handle_monitoring_error(e)
-            # Ensure next check is scheduled even after error
-            interval = self.validate_interval() * 1000
-            self.scheduled_check = self.after(interval, self.monitor_product)
+            self.log_error(f"Error in monitor_product: {str(e)}")
 
     def handle_stock_status(self, is_available: bool, product_name: str, status_details: Dict):
         """Handle the stock status response."""
@@ -326,20 +297,25 @@ class ProductMonitor(BaseMonitor):
             self.log_message(f"⚠️ Could not send notification: {str(e)}")
 
     def check_stock(self):
-        """Check stock status for the product."""
+        """Check stock for the monitored product."""
+        print(f"Checking stock for URL: {self.url}")
         try:
-            print(f"Checking stock for URL: {self.url}")
-            from ..utils.helpers import check_stock, parse_url
-            
+            # Parse URL to get product ID
             product_id = parse_url(self.url)
             print(f"Parsed product ID: {product_id}")
             
+            # Check stock status
             success, name, info = check_stock(product_id)
             print(f"Stock check result: {success}, {name}, {info}")
-            
             return success, name, info
             
-        except Exception as e:
+        except URLParseError as e:
             print(f"Error in check_stock: {str(e)}")
             self.log_error(str(e))
-            raise  # Re-raise to be handled by monitor_product 
+            return False, None, {'error': 'Failed to check product'}
+
+    def log_error(self, message: str):
+        """Log an error message."""
+        self.log_message(f"❌ Error: {message}")
+        self.log_display.insert(tk.END, f"❌ Error: {message}\n")
+        self.log_display.see(tk.END) 

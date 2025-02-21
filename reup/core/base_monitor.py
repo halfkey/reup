@@ -5,15 +5,17 @@ from ..config.styles import STYLES
 import logging
 from ..utils.helpers import get_timestamp
 
-class BaseMonitor(ttk.Frame, ABC):
-    """Base class for monitor tabs."""
+class BaseMonitor(ABC, ttk.Frame):
+    """Abstract base class for monitors."""
     
-    def __init__(self, parent, main_app):
-        super().__init__(parent)
+    def __init__(self, parent, main_app, test_mode=False):
+        """Initialize the base monitor."""
         self.main_app = main_app
-        self.style = main_app.style
-        self.log_display = None
         self.parent = parent
+        if not test_mode:
+            super().__init__(parent)  # Only initialize ttk.Frame if not in test mode
+        self.style = main_app.style if hasattr(main_app, 'style') else None
+        self.log_display = None
         
     @abstractmethod
     def setup_ui(self):

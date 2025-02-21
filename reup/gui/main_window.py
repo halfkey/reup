@@ -17,9 +17,9 @@ from pathlib import Path
 class StockMonitorGUI:
     """Main GUI application for stock monitoring."""
     
-    def __init__(self):
+    def __init__(self, root=None):
         """Initialize the main window."""
-        self.root = tk.Tk()
+        self.root = root or tk.Tk()  # Allow passing root for testing
         self.root.title("Reup")  # Changed from "Stock Monitor" to "Reup"
         
         # Set window size

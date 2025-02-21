@@ -1,16 +1,26 @@
-from stock_monitor.core.base_monitor import BaseMonitor
+import pytest
+from unittest.mock import MagicMock
+from tests.test_utils.test_monitor import TestMonitor
 
-class TestMonitor(BaseMonitor):
-    """Concrete implementation of BaseMonitor for testing."""
-    def __init__(self, parent, main_app):
-        super().__init__(parent, main_app)
-        self.parent = parent  # Explicitly set parent
+@pytest.fixture
+def test_monitor():
+    """Create a test monitor instance for testing."""
+    # Create instance with mocked components
+    root = MagicMock()
+    app = MagicMock()
+    monitor = TestMonitor(root, "https://test.com", app)
     
-    def setup_ui(self):
-        pass
-        
-    def start_monitoring(self):
-        pass
-        
-    def stop_monitoring(self):
-        pass 
+    # Add required mocks
+    monitor.log_display = MagicMock()
+    monitor.status_label = MagicMock()
+    monitor.after = MagicMock()
+    monitor.after_cancel = MagicMock()
+    
+    return monitor
+
+def test_monitor_functionality(test_monitor):
+    """Test basic monitor functionality."""
+    success, name, status = test_monitor.check_stock()
+    assert success
+    assert name == "Test Product"
+    assert status['status'] == 'InStock' 

@@ -11,6 +11,7 @@ setup(
         "requests>=2.31.0",
         "beautifulsoup4>=4.12.0",
         "plyer>=2.1.0",
+        "PyYAML>=6.0.1",
     ],
     entry_points={
         "console_scripts": [

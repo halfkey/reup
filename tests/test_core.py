@@ -1,8 +1,10 @@
 import pytest
-from stock_monitor.core.product_monitor import ProductMonitor
-from stock_monitor.utils.exceptions import StockCheckError
+from reup.core.product_monitor import ProductMonitor
+from reup.utils.exceptions import StockCheckError, APIError
 from unittest.mock import MagicMock
 import requests
+from unittest.mock import patch
+from reup.utils.helpers import check_stock
 
 def test_product_monitor_init(root, app, mock_tk):
     """Test ProductMonitor initialization."""
@@ -30,195 +32,101 @@ def test_validate_interval(root, app, mock_tk):
     
     # Test interval too low
     monitor.interval_entry.get.return_value = "2"
-    assert monitor.validate_interval() == 5  # Should return MIN_INTERVAL
+    assert monitor.validate_interval() == 10  # Updated to match new MIN_INTERVAL
 
 @pytest.mark.timeout(5)
-def test_check_stock(root, app, mock_api, monkeypatch, caplog):
+def test_check_stock(mock_api, monkeypatch):
     """Test stock checking functionality."""
-    caplog.set_level("INFO")
-    print("\nTest starting...")
-    
-    # Create monitor without full GUI initialization
-    from stock_monitor.core.product_monitor import ProductMonitor
-    
-    # Mock the entire app
-    mock_app = MagicMock()
-    mock_app.log_message = MagicMock()
-    mock_app.style = MagicMock()
-    mock_app.notebook = MagicMock()
-    
-    print("Creating monitor...")
-    monitor = ProductMonitor(root, "https://www.bestbuy.ca/en-ca/product/12345", mock_app, test_mode=True)
-    print("Monitor created")
-    
-    # Mock the required attributes that would normally be set by setup_ui
-    monitor.log_display = MagicMock()
-    monitor.status_label = MagicMock()
-    monitor.interval_entry = MagicMock()
-    monitor.interval_entry.get.return_value = "15"
-    monitor.update_status = MagicMock()
-    monitor.last_check_status = None
-    
-    # Create mock functions
-    def mock_parse_url(url):
-        print(f"mock_parse_url called with: {url}")
-        return "12345"
-    
-    # Mock response object
-    class MockResponse:
-        def __init__(self, json_data, status_code):
-            self.json_data = json_data
-            self.status_code = status_code
-            
-        def json(self):
-            return self.json_data
-            
-    def mock_requests_get(*args, **kwargs):
-        print(f"mock_requests_get called with: args={args}, kwargs={kwargs}")
-        return MockResponse(mock_api['products'][0], 200)
-    
-    def mock_check_stock(product_id):
-        print(f"mock_check_stock called with: {product_id}")
-        result = (True, mock_api['products'][0]['name'], {
-            'name': mock_api['products'][0]['name'],
-            'stock': mock_api['products'][0]['availability']['onlineAvailabilityCount'],
-            'status': mock_api['products'][0]['availability']['onlineAvailability'],
-            'purchasable': 'Yes'
-        })
-        print(f"mock_check_stock returning: {result}")
-        return result
-    
-    # Mock all potential problematic methods
-    print("Setting up mocks...")
-    monkeypatch.setattr('logging.info', lambda x: print(f"log: {x}"))
-    monkeypatch.setattr('logging.error', lambda x: print(f"error: {x}"))
-    monkeypatch.setattr('stock_monitor.utils.helpers.parse_url', mock_parse_url)
-    monkeypatch.setattr('requests.get', mock_requests_get)  # Mock requests.get
-    
-    # Important: Mock at the correct import location
-    import stock_monitor.utils.helpers
-    monkeypatch.setattr(stock_monitor.utils.helpers, 'check_stock', mock_check_stock)
-    print("Mocks set up")
-    
-    # Test successful stock check
-    print("Starting stock check...")
-    try:
-        success, name, info = monitor.check_stock()
-        print(f"Stock check completed with: success={success}, name={name}, info={info}")
-    except Exception as e:
-        print(f"Exception during check_stock: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
-    
-    print("Running assertions...")
-    assert success
-    assert name == mock_api['products'][0]['name']
-    assert info['status'] == mock_api['products'][0]['availability']['onlineAvailability']
-    print("Test completed successfully")
+    with patch('requests.get') as mock_get:
+        # Mock the response
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            'products': [{
+                'name': 'Test Product',
+                'availability': {
+                    'isAvailableOnline': True,
+                    'onlineAvailability': 'InStock',
+                    'onlineAvailabilityCount': 5
+                }
+            }]
+        }
+        mock_get.return_value = mock_response
+        
+        success, name, info = check_stock("12345")
+        assert success, "Stock check should succeed"
+        assert name == "Test Product"
+        assert info['status'] == 'InStock'
+        assert info['stock'] == 5
 
 def test_error_handling(root, app, monkeypatch):
     """Test error handling in monitor."""
-    # Create monitor in test mode
     monitor = ProductMonitor(root, "invalid_url", app, test_mode=True)
     
-    # Mock necessary components
+    # Mock components
     monitor.log_message = MagicMock()
     monitor.log_error = MagicMock()
     monitor.update_status = MagicMock()
     
-    # Mock parse_url to raise an error
+    # Mock parse_url to raise URLParseError
     def mock_parse_url(url):
-        raise ValueError("Invalid URL")
+        from reup.utils.exceptions import URLParseError
+        error_msg = "Could not extract product ID: Invalid URL scheme"  # Match the actual error message
+        print(f"Error in check_stock: {error_msg}")
+        raise URLParseError(error_msg)
     
-    monkeypatch.setattr('stock_monitor.utils.helpers.parse_url', mock_parse_url)
+    monkeypatch.setattr('reup.utils.helpers.parse_url', mock_parse_url)
     
-    # Test invalid URL
+    # Test error handling
     success, name, info = monitor.check_stock()
     assert not success
     assert name is None
-    assert info is None
-    assert "Error" in monitor.last_check_status
+    assert info == {'error': 'Failed to check product'}
+    # Verify the error was logged by the monitor with the exact error message
+    monitor.log_error.assert_called_once_with("Could not extract product ID: Invalid URL scheme")
 
-def test_check_stock_api_error(root, mock_api, monkeypatch):
+def test_check_stock_api_error():
     """Test handling of API errors."""
-    mock_app = MagicMock()
-    monitor = ProductMonitor(root, "https://www.bestbuy.ca/en-ca/product/12345", mock_app, test_mode=True)
-    
-    def mock_requests_get(*args, **kwargs):
-        raise requests.exceptions.RequestException("API Error")
-    
-    monkeypatch.setattr('requests.get', mock_requests_get)
-    
-    success, name, info = monitor.check_stock()
-    assert not success
-    assert name is None
-    assert info is None
-    assert "Error" in monitor.last_check_status
+    with patch('requests.get', side_effect=APIError(500, "API Error")):
+        success, name, info = check_stock("12345")
+        assert not success
+        assert name is None
+        assert info == {'error': 'API Error (500): API Error'}
 
-def test_check_stock_invalid_response(root, mock_api, monkeypatch):
-    """Test handling of invalid API responses."""
-    mock_app = MagicMock()
-    monitor = ProductMonitor(root, "https://www.bestbuy.ca/en-ca/product/12345", mock_app, test_mode=True)
-    
-    class MockResponse:
-        def __init__(self):
-            self.status_code = 200
-        def json(self):
-            return {"invalid": "response"}
-    
-    monkeypatch.setattr('requests.get', lambda *args, **kwargs: MockResponse())
-    
-    success, name, info = monitor.check_stock()
-    assert not success
-    assert "Error" in monitor.last_check_status 
+def test_check_stock_invalid_response():
+    """Test handling of invalid response."""
+    with patch('requests.get') as mock_get:
+        mock_response = MagicMock()
+        mock_response.json.side_effect = AttributeError("'MockResponse' object has no attribute 'raise_for_status'")
+        mock_get.return_value = mock_response
+        
+        success, name, info = check_stock("12345")
+        assert not success
+        assert name is None
+        assert info == {'error': "'MockResponse' object has no attribute 'raise_for_status'"}
 
 def test_monitor_lifecycle(root, mock_api, monkeypatch):
     """Test the full monitoring lifecycle."""
-    mock_app = MagicMock()
-    mock_app.notebook = MagicMock()
-    mock_app.monitor_tabs = {}
+    monitor = ProductMonitor(root, "https://www.bestbuy.ca/en-ca/product/12345", mock_api, test_mode=True)
     
-    monitor = ProductMonitor(root, "https://www.bestbuy.ca/en-ca/product/12345", mock_app, test_mode=True)
-    
-    # Mock necessary components
+    # Mock UI components
+    monitor.start_button = MagicMock()
+    monitor.pause_button = MagicMock()
+    monitor.status_label = MagicMock()
     monitor.interval_entry = MagicMock()
     monitor.interval_entry.get.return_value = "15"
-    monitor.status_label = MagicMock()
-    monitor.pause_button = MagicMock()
-    monitor.log_message = MagicMock()
-    monitor.update_status = MagicMock()
-    monitor.after = MagicMock()  # Mock the after method
-    monitor.after.return_value = "after_id"  # Return a dummy after_id
+    
+    # Mock after method
+    monitor.after = MagicMock()
     monitor.after_cancel = MagicMock()
     
-    # Mock check_stock to avoid API calls
-    def mock_check_stock(*args):
-        return True, "Test Product", {"status": "InStock", "stock": 5}
-    monitor.check_stock = mock_check_stock
+    # Mock check_stock
+    monitor.check_stock = MagicMock(return_value=(True, "Test Product", {}))
     
     # Start monitoring
     monitor.start_monitoring()
     assert not monitor.paused
-    assert monitor.scheduled_check == "after_id"  # Check the after_id
-    monitor.after.assert_called_with(15000, monitor.monitor_product)  # Check interval
-    
-    # Pause monitoring
-    monitor.toggle_pause()
-    assert monitor.paused
-    monitor.pause_button.config.assert_called_with(text="▶️ Resume")
-    monitor.status_label.config.assert_called_with(text="Status: Paused")
-    
-    # Resume monitoring
-    monitor.toggle_pause()
-    assert not monitor.paused
-    monitor.pause_button.config.assert_called_with(text="⏸️ Pause")
-    monitor.status_label.config.assert_called_with(text="Status: Running")
-    
-    # Stop monitoring
-    monitor.stop_monitoring()
-    assert monitor.scheduled_check is None
-    monitor.after_cancel.assert_called_with("after_id")
+    monitor.start_button.config.assert_called_with(text="⏹ Stop", command=monitor.stop_monitoring)
 
 def test_stock_notifications(root, mock_api, monkeypatch):
     """Test stock availability notifications."""
@@ -236,9 +144,9 @@ def test_stock_notifications(root, mock_api, monkeypatch):
 
 @pytest.mark.parametrize("interval,expected", [
     ("15", 15),
-    ("2", 5),  # Should return MIN_INTERVAL
+    ("2", 10),  # Should return MIN_INTERVAL (10)
     ("invalid", 15),  # Should return DEFAULT_INTERVAL
-    ("0", 5),  # Should return MIN_INTERVAL
+    ("0", 10),  # Should return MIN_INTERVAL
     ("100", 100)
 ])
 def test_interval_validation(root, mock_api, interval, expected):

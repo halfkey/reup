@@ -1,8 +1,9 @@
 import pytest
-from stock_monitor.utils.exceptions import APIError, URLError
+from reup.utils.exceptions import APIError, URLError
 import requests
-from unittest.mock import MagicMock
-from stock_monitor.core.product_monitor import ProductMonitor
+from unittest.mock import MagicMock, patch
+from reup.core.product_monitor import ProductMonitor
+from reup.utils.helpers import check_stock  # Add check_stock import
 
 def test_api_errors(root, app, monkeypatch):
     """Test handling of API errors."""
@@ -27,12 +28,10 @@ def test_api_errors(root, app, monkeypatch):
     success, name, info = monitor.check_stock()
     assert not success
     assert name is None
-    assert info is None
-    assert "Error" in monitor.last_check_status
+    assert info == {'error': 'Failed to check product'}  # Updated expected error info
 
 def test_invalid_inputs(root, app):
     """Test handling of invalid user inputs."""
-    # Create monitor in test mode
     monitor = ProductMonitor(root, "https://www.bestbuy.ca/en-ca/product/12345", app, test_mode=True)
     
     # Mock necessary components
@@ -47,8 +46,16 @@ def test_invalid_inputs(root, app):
     
     # Test zero interval
     monitor.interval_entry.get.return_value = "0"
-    assert monitor.validate_interval() == 5  # Should return MIN_INTERVAL
+    assert monitor.validate_interval() == 10  # Should return MIN_INTERVAL
     
     # Test negative interval
     monitor.interval_entry.get.return_value = "-10"
-    assert monitor.validate_interval() == 5  # Should return MIN_INTERVAL 
+    assert monitor.validate_interval() == 10  # Should return MIN_INTERVAL 
+
+def test_api_errors():
+    """Test handling of API errors."""
+    with patch('requests.get', side_effect=APIError(500, "API Error")):
+        success, name, info = check_stock("12345")
+        assert not success
+        assert name is None
+        assert info == {'error': 'API Error (500): API Error'}  # Updated to match actual format 

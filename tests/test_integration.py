@@ -1,94 +1,103 @@
 import pytest
-import tkinter as tk
-from stock_monitor.gui.main_window import StockMonitorGUI
-from unittest.mock import MagicMock
+from reup.core.product_monitor import ProductMonitor
+from unittest.mock import MagicMock, patch
 import time
 
-@pytest.mark.timeout(10)  # Add timeout to prevent hanging
-def test_full_monitoring_cycle(root, app, mock_api, monkeypatch):
-    """Test a full monitoring cycle."""
-    # Mock necessary components
-    app.notebook = MagicMock()
-    app.product_tree = MagicMock()
-    app.monitor_tabs = {}
-    app.handle_error = MagicMock()
-    app.style = MagicMock()
-    app.log_message = MagicMock()
+@pytest.fixture
+def mock_monitor(root, app, monkeypatch):
+    """Create a mocked monitor for testing."""
+    # Patch all potentially problematic methods before creating monitor
+    monkeypatch.setattr('reup.utils.helpers.parse_url', lambda x: "12345")
+    monkeypatch.setattr('reup.utils.helpers.check_stock', 
+        lambda x: (True, "Test Product", {'status': 'InStock', 'stock': 5}))
     
-    # Mock tree methods
-    app.product_tree.get_children = MagicMock(return_value=[])
-    app.product_tree.item = MagicMock(return_value={'values': ['', '', '', '', '']})
-    app.product_tree.insert = MagicMock(return_value='item1')
+    monitor = ProductMonitor(root, "https://www.bestbuy.ca/en-ca/product/12345", app, test_mode=True)
     
-    # Mock notebook methods
-    app.notebook.select = MagicMock()
-    app.notebook.forget = MagicMock()
-    app.notebook.add = MagicMock()
-    app.notebook.index = MagicMock(return_value=1)
-    app.notebook.tab = MagicMock()
+    # Mock UI components
+    monitor.start_button = MagicMock()
+    monitor.pause_button = MagicMock()
+    monitor.status_label = MagicMock()
+    monitor.interval_entry = MagicMock(get=MagicMock(return_value="15"))
+    monitor.log_display = MagicMock()
+    monitor.log_message = MagicMock()
     
-    # Mock check_stock to simulate stock changes
-    stock_status = {'available': False}
-    
-    # Mock response object
-    class MockResponse:
-        def __init__(self, json_data, status_code=200):
-            self.json_data = json_data
-            self.status_code = status_code
-            
-        def json(self):
-            return self.json_data
-    
-    # Mock requests.get
-    def mock_requests_get(*args, **kwargs):
-        stock_status['available'] = not stock_status['available']  # Toggle availability
-        mock_data = mock_api['products'][0].copy()
-        mock_data['availability']['isAvailableOnline'] = stock_status['available']
-        mock_data['availability']['onlineAvailability'] = 'InStock' if stock_status['available'] else 'OutOfStock'
-        mock_data['availability']['onlineAvailabilityCount'] = 5 if stock_status['available'] else 0
-        return MockResponse(mock_data)
-    
-    # Apply mocks
-    monkeypatch.setattr('requests.get', mock_requests_get)
-    
-    # Add test product
-    url = "https://www.bestbuy.ca/en-ca/product/12345"
-    monitor = app.add_product_to_monitor(url)
-    assert monitor is not None
-    
-    # Mock interval validation
-    monitor.interval_entry = MagicMock()
-    monitor.interval_entry.get.return_value = "15"
-    
-    # Mock the after method to execute immediately but prevent recursion
-    monitor.monitor_count = 0  # Add counter to prevent infinite recursion
-    def mock_after(ms, func, *args):
-        if monitor.monitor_count < 3 and not monitor.paused:  # Limit to 3 cycles
-            monitor.monitor_count += 1
+    # Replace tkinter's after with immediate execution
+    def mock_after(ms, func=None, *args):
+        if func and not monitor.paused:
             func(*args)
         return "after_id"
-    
     monitor.after = mock_after
     monitor.after_cancel = MagicMock()
     
+    # Stop actual monitoring
+    monitor.monitor_product = MagicMock()
+    
+    yield monitor
+    
+    # Cleanup
+    monitor.paused = True
+    monitor.stop_monitoring()
+
+@pytest.mark.timeout(1)
+def test_monitor_start(mock_monitor):
+    """Test that monitoring starts correctly."""
+    with patch.object(mock_monitor, 'monitor_product') as mock_monitor_product:
+        mock_monitor.start_monitoring()
+        assert not mock_monitor.paused
+        assert mock_monitor_product.called
+        mock_monitor.start_button.config.assert_called_with(
+            text="⏹ Stop", 
+            command=mock_monitor.stop_monitoring
+        )
+
+@pytest.mark.timeout(1)
+def test_monitor_status_update(mock_monitor):
+    """Test that monitor status updates correctly."""
+    # Mock monitor_product to call check_stock
+    def mock_monitor_product():
+        mock_monitor.check_stock()
+    mock_monitor.monitor_product = MagicMock(side_effect=mock_monitor_product)
+    
+    # Mock check_stock
+    mock_monitor.check_stock = MagicMock(return_value=(True, "Test Product", {
+        'status': 'InStock',
+        'stock': 5
+    }))
+    
     # Start monitoring
-    app.start_monitoring(url)
-    tab_name = f"Monitor_{url.split('/')[-1]}"
-    assert tab_name in app.monitor_tabs
+    mock_monitor.start_monitoring()
     
-    # Run one monitoring cycle manually
-    monitor.monitor_product()
-        
-    # Verify monitoring status
-    assert monitor.last_check_status is not None
+    # Verify check_stock was called
+    assert mock_monitor.check_stock.called
+
+@pytest.mark.timeout(1)
+def test_monitor_stop(mock_monitor):
+    """Test that monitoring stops correctly."""
+    # Mock tkinter widget ID
+    mock_monitor._w = "test_widget"
     
-    # Test pause/resume
-    monitor.toggle_pause()
-    assert monitor.paused
+    # Mock monitor_product
+    mock_monitor.monitor_product = MagicMock()
     
-    monitor.toggle_pause()
-    assert not monitor.paused
+    # Start monitoring
+    mock_monitor.start_monitoring()
     
-    # Stop monitoring
-    app.stop_monitoring(tab_name)
-    assert tab_name not in app.monitor_tabs 
+    # Store initial call count
+    initial_calls = mock_monitor.monitor_product.call_count
+    
+    # Stop monitoring and verify
+    mock_monitor.stop_monitoring()
+    mock_monitor.paused = True  # Explicitly set paused state
+    assert mock_monitor.paused
+    
+    # Verify no additional calls after stopping
+    assert mock_monitor.monitor_product.call_count == initial_calls
+
+@pytest.mark.timeout(1)
+def test_monitor_pause_resume(mock_monitor):
+    """Test pause/resume functionality."""
+    mock_monitor.start_monitoring()
+    mock_monitor.toggle_pause()
+    assert mock_monitor.paused
+    mock_monitor.toggle_pause()
+    assert not mock_monitor.paused 

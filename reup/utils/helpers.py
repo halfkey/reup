@@ -4,7 +4,7 @@ from datetime import datetime
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from typing import Dict, Tuple, Any
+from typing import Dict, Tuple, Any, Optional
 from ..utils.exceptions import APIError, URLParseError
 import re
 from urllib.error import URLError
@@ -95,118 +95,30 @@ def create_session() -> requests.Session:
     
     return session
 
-def check_stock(product_id: str) -> tuple[bool, str, dict]:
-    """
-    Check stock status for a product using HTML parsing only.
-    Returns (success, name, result) where:
-    - success: bool indicating if check was successful
-    - name: str product name
-    - result: dict containing stock info {'stock': str, 'price': float, 'status': str}
-    """
+def check_stock(product_id: str) -> Tuple[bool, Optional[str], Dict]:
+    """Check stock status for a product."""
     try:
-        session = create_session()
-        
-        url = f"https://www.bestbuy.ca/en-ca/product/{product_id}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'text/html'
-        }
-        
-        response = session.get(url, headers=headers, timeout=(5, 10))
+        # Make request to Best Buy API
+        response = requests.get(f"https://www.bestbuy.ca/en-ca/product/{product_id}")
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Get product name
-        name = soup.find('h1').text.strip() if soup.find('h1') else 'Unknown Product'
-        
-        # Get price - Best Buy specific price finding
-        price = 0.0
-        try:
-            # Try to find the main price container
-            price_container = soup.find('div', class_='price_FHDfG')
-            if price_container:
-                # Look for the large price text
-                price_text = price_container.find('span', {'data-automation': 'product-price'})
-                if price_text:
-                    price_str = price_text.text.strip().replace('$', '').replace(',', '')
-                    price = float(price_str)
-                    logger.debug(f"Found price from main price container: ${price}")
+        # Parse response
+        data = response.json()
+        if not data.get('products'):
+            return False, None, {'error': 'No product data found'}
             
-            # Fallback: Try to find price in meta tags
-            if price == 0.0:
-                price_meta = soup.find('meta', {'property': 'product:price:amount'})
-                if price_meta:
-                    price = float(price_meta.get('content', '0.0'))
-                    logger.debug(f"Found price from meta tag: ${price}")
-        except (ValueError, AttributeError) as e:
-            logger.warning(f"Error parsing price: {str(e)}")
-            price = 0.0
+        product = data['products'][0]
+        name = product.get('name')
+        availability = product.get('availability', {})
         
-        # Check for definitive out-of-stock indicators
-        out_of_stock_indicators = [
-            'sold out',
-            'coming soon',
-            'not available online',
-            'check stores'
-        ]
-        
-        # Check for definitive in-stock indicators
-        in_stock_indicators = [
-            'add to cart',
-            'ship it'
-        ]
-        
-        page_text = soup.text.lower()
-        
-        # Look for the add to cart button specifically
-        add_to_cart_btn = soup.find('button', {'data-button-state': 'ADD_TO_CART'})
-        add_to_cart_enabled = add_to_cart_btn and not add_to_cart_btn.get('disabled')
-        
-        # Determine stock status
-        is_out_of_stock = any(indicator in page_text for indicator in out_of_stock_indicators)
-        is_in_stock = (
-            any(indicator in page_text for indicator in in_stock_indicators) or 
-            add_to_cart_enabled
-        )
-        
-        # Make final determination
-        if is_in_stock and not is_out_of_stock:
-            status = 'Available'
-            stock = '1'
-        else:
-            status = 'Out of Stock'
-            stock = '0'
-            
-        # Log findings
-        logger.info(f"Stock check for {product_id}:")
-        logger.info(f"- Name: {name}")
-        logger.info(f"- Price: ${price}")
-        logger.info(f"- Add to cart button enabled: {add_to_cart_enabled}")
-        logger.info(f"- Out of stock indicators found: {is_out_of_stock}")
-        logger.info(f"- In stock indicators found: {is_in_stock}")
-        logger.info(f"- Final status: {status}")
-        
-        result = {
-            'price': price,
-            'stock': stock,
-            'status': status,
-            'purchasable': 'Yes' if stock == '1' else 'No'
+        return True, name, {
+            'status': availability.get('onlineAvailability'),
+            'stock': availability.get('onlineAvailabilityCount')
         }
         
-        return True, name, result
-        
-    except requests.Timeout:
-        logger.error(f"Timeout checking product {product_id}")
-        return False, None, {"error": "Request timed out"}
-    except requests.RequestException as e:
-        logger.error(f"Error checking product {product_id}: {str(e)}")
-        return False, None, {"error": "Failed to check product"}
     except Exception as e:
-        logger.error(f"Unexpected error checking product {product_id}: {str(e)}")
-        return False, None, {"error": "Internal error"}
-    finally:
-        if 'session' in locals():
-            session.close()
+        logging.error(f"Error checking product {product_id}: {str(e)}")
+        return False, None, {'error': str(e)}
 
 def save_profile(filename: str, profile_data: Dict) -> bool:
     """Save profile data to file."""

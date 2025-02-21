@@ -27,4 +27,4 @@
 ## Testing
 - Add tests for new features
 - Maintain test coverage
-- Run full test suite before submitting PR 
+- Run full test suite before submitting PR
