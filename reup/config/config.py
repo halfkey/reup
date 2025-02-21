@@ -4,9 +4,10 @@ import json
 import os
 from typing import Any, Dict, Optional
 
+
 class Config:
     """Centralized configuration management"""
-    
+
     DEFAULT_CONFIG = {
         "check_interval": 15,
         "min_interval": 5,
@@ -15,40 +16,36 @@ class Config:
         "enable_notifications": True,
         "log_level": "INFO",
         "rate_limit": 1.0,
-        "api": {
-            "max_retries": 3,
-            "timeout": 20,
-            "backoff_factor": 1.0
-        },
+        "api": {"max_retries": 3, "timeout": 20, "backoff_factor": 1.0},
         "security": {
             "file_permissions": "0600",
             "dir_permissions": "0700",
-            "enable_ssl_verify": True
+            "enable_ssl_verify": True,
         },
         "cache": {
             "enable": True,
             "max_age": 300,  # 5 minutes
-            "max_size": 1000  # entries
-        }
+            "max_size": 1000,  # entries
+        },
     }
-    
+
     def __init__(self):
         self.config_dir = Path.home() / ".reup"
         self.config_file = self.config_dir / "config.json"
         self.config: Dict[str, Any] = {}
         self._ensure_config_dir()
         self.load_config()
-    
+
     def _ensure_config_dir(self) -> None:
         """Create and secure config directory."""
         self.config_dir.mkdir(parents=True, exist_ok=True)
         os.chmod(self.config_dir, 0o700)
-    
+
     def load_config(self) -> None:
         """Load or create configuration."""
         try:
             if self.config_file.exists():
-                with open(self.config_file, 'r') as f:
+                with open(self.config_file, "r") as f:
                     user_config = json.load(f)
                 # Deep merge with defaults
                 self.config = self._deep_merge(self.DEFAULT_CONFIG.copy(), user_config)
@@ -57,7 +54,7 @@ class Config:
                 self.save_config()
         except Exception as e:
             raise ConfigError(f"Failed to load config: {str(e)}")
-    
+
     def _deep_merge(self, base: Dict, update: Dict) -> Dict:
         """Deep merge two dictionaries."""
         for key, value in update.items():
@@ -69,7 +66,7 @@ class Config:
 
     def save_config(self):
         """Save the current configuration to file."""
-        with open(self.config_file, 'w') as f:
+        with open(self.config_file, "w") as f:
             json.dump(self.config)
 
     def get_config(self):
@@ -285,4 +282,4 @@ class Config:
         """Load or create default configuration"""
         if not self.config_file.exists():
             self.create_default_config()
-        # ... config loading logic 
+        # ... config loading logic

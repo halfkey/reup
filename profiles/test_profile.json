@@ -1,0 +1,12 @@
+{
+    "products": [
+        {
+            "name": "Test Product",
+            "url": "https://www.bestbuy.ca/en-ca/product/12345"
+        },
+        {
+            "name": "Test Product",
+            "url": "https://www.bestbuy.ca/en-ca/product/67890"
+        }
+    ]
+}
