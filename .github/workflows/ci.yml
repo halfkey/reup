@@ -31,7 +31,7 @@ jobs:
         
     - name: Run tests with coverage
       run: |
-        python -m pytest -v --cov=reup --cov-report=term-missing
+        python -m pytest -v --cov=reup --cov-report=term-missing --cov-fail-under=50
         
     # Temporarily comment out formatting checks
     # - name: Check formatting

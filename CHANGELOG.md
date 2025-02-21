@@ -26,6 +26,16 @@
 - Standardized code formatting
 - Added code quality checks
 
+### In Progress
+- Improving test coverage for:
+  - reup/config/config.py
+  - reup/managers/cache_manager.py
+  - reup/managers/request_manager.py
+  - reup/managers/security_manager.py
+  - reup/utils/performance.py
+  - reup/utils/profile_validator.py
+  - reup/utils/validators.py
+
 ## [1.0.0] - 2024-02-20
 ### Added
 - Initial release of Reup
