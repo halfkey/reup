@@ -1,27 +1,81 @@
-# Stock Monitor
+# Reup
 
-A desktop application for monitoring product stock at Best Buy.
+A desktop application for monitoring Best Buy Canada product stock with real-time notifications.
 
 ## Features
-- Real-time stock monitoring
-- Multiple product tracking
-- Profile management
-- Search functionality
-- Customizable check intervals
-- Stock notifications
+- 🔍 Real-time stock monitoring
+- 🔔 Desktop notifications
+- 💾 Profile management for saving product lists
+- 🔒 Secure file handling and logging
+- ⚡ Rate limiting to prevent API abuse
+- 🖥️ Modern GUI interface
 
 ## Installation
-1. Ensure Python 3.8+ is installed
-2. Clone this repository
-3. Install requirements: `pip install -r requirements.txt`
-4. Run the program: `python run.py`
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/reup.git
+cd reup
+
+# Install dependencies
+pip install -r requirements.txt
+```
 
 ## Usage
-1. Search for products using the search bar
-2. Add products to monitoring list
-3. Set check interval
-4. Start monitoring
-5. Create and manage profiles for different product sets
 
-## Version
-Current version: 1.0 
+```bash
+# Run the application
+python run.py
+```
+
+### Creating a Profile
+1. Click "New Profile"
+2. Enter profile name
+3. Add product URLs
+4. Click "Save Profile"
+
+### Monitoring Products
+1. Select a profile or add individual URLs
+2. Set check interval (minimum 5 seconds)
+3. Click "Start Monitoring"
+
+## Development
+
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+pytest
+
+# Format code
+black .
+
+# Run linting
+flake8
+```
+
+## Requirements
+- Python 3.8+
+- Operating System: Windows, macOS, or Linux
+- Internet connection
+
+## Security Features
+- Secure file permissions
+- Rate limiting
+- Input validation
+- Security event logging
+- HTTPS-only connections
+
+## Contributing
+Pull requests are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+- Best Buy Canada for their product API
+- Contributors and testers
+
+## Support
+For support, please open an issue on GitHub.
