@@ -14,7 +14,7 @@ A desktop application for monitoring Best Buy Canada product stock with real-tim
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/reup.git
+git clone https://github.com/halfkey/reup.git
 cd reup
 
 # Install dependencies
