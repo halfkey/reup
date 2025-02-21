@@ -1,0 +1,10 @@
+-r requirements.txt
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-timeout>=2.1.0  # Add timeout plugin
+pytest-asyncio>=0.21.0  # For async tests if needed
+black>=22.0.0
+flake8>=4.0.0
+-e .
+watchdog>=2.1.0 

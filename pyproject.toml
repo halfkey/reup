@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reup"
+version = "1.0.0"
+description = "A desktop application for monitoring product stock"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "plyer>=2.1.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+]
+
+[tool.pytest]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+markers = [
+    "timeout: mark test with timeout (pytest-timeout)"
+]
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "INFO"
+markers = [
+    "timeout: mark test to fail after given seconds",
+    "integration: mark test as integration test",
+    "slow: mark test as slow running"
+]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v --tb=short --cov=reup --cov-report=term-missing" 
