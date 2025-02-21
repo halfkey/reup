@@ -26,11 +26,11 @@ class ProfileSaveError(ProfileError):
     """Exception raised when saving a profile fails."""
     pass
 
-class APIError(StockCheckError):
+class APIError(Exception):
     """Exception raised for API errors."""
-    def __init__(self, status_code, message):
-        self.status_code = status_code
-        super().__init__(f"API Error ({status_code}): {message}")
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
 
 class URLError(StockCheckError):
     """Exception raised for invalid URLs."""

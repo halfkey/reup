@@ -9,6 +9,9 @@ from tests.test_helpers import TestMonitor
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+# Import from reup package
+from reup.gui.main_window import StockMonitorGUI
+
 class MockVariable:
     """Mock base class for tkinter variables."""
     _default = ""
@@ -97,24 +100,13 @@ class MockEntry(MockWidget):
     def insert(self, index, string):
         self._value = string
 
-class MockTk(MockWidget):
-    """Mock Tk root window."""
+class MockTk:
+    """Mock Tk window."""
     def __init__(self):
-        super().__init__()
-        self.configure = MagicMock()
-        self.grid_rowconfigure = MagicMock()
-        self.grid_columnconfigure = MagicMock()
-        self.protocol = MagicMock()
-        self.title = MagicMock()
-        self.geometry = MagicMock()
-        self.resizable = MagicMock()
-        self._default_root = self
-        self._last_child_ids = {}
-        self._w = "."
-        self._after_ids = {}
-        self._after_counter = 0
+        self.calls = []
+        self.protocol_handlers = {}
         
-        # Mock tk interpreter
+        # Add tk interpreter mock
         self.tk = MagicMock()
         self.tk.call = MagicMock(return_value=None)
         self.tk.getvar = MagicMock(return_value='')
@@ -125,6 +117,43 @@ class MockTk(MockWidget):
         self.createcommand = MagicMock()
         self.deletecommand = MagicMock()
         self.eval = MagicMock(return_value='')
+        
+        # Add widget attributes
+        self._w = "."
+        self._last_child_ids = {}
+        self._after_ids = {}
+        self._after_counter = 0
+        
+        # Add children tracking
+        self.children = {}  # Required by tkinter for widget hierarchy
+        
+    def title(self, title_str):
+        self.calls.append(('title', title_str))
+        
+    def geometry(self, geometry_str):
+        self.calls.append(('geometry', geometry_str))
+        
+    def minsize(self, width, height):
+        self.calls.append(('minsize', width, height))
+        
+    def configure(self, **kwargs):
+        self.calls.append(('configure', kwargs))
+        
+    def resizable(self, width, height):
+        self.calls.append(('resizable', width, height))
+        
+    def grid_rowconfigure(self, row, **kwargs):
+        self.calls.append(('grid_rowconfigure', row, kwargs))
+        
+    def grid_columnconfigure(self, col, **kwargs):
+        self.calls.append(('grid_columnconfigure', col, kwargs))
+        
+    def protocol(self, name, handler):
+        self.protocol_handlers[name] = handler
+        self.calls.append(('protocol', name, handler))
+        
+    def destroy(self):
+        self.calls.append(('destroy',))
         
     def after(self, ms, func=None, *args):
         """Mock the after method."""
@@ -296,42 +325,34 @@ def mock_ttk():
 
 @pytest.fixture
 def mock_tk():
-    """Create mock Tk window."""
-    mock = MagicMock()
-    mock.Tk = MockTk
-    mock.Frame = lambda *args, **kwargs: MockWidget(*args, **kwargs)
-    mock.Label = lambda *args, **kwargs: MockWidget(*args, **kwargs)
-    mock.Button = lambda *args, **kwargs: MockWidget(*args, **kwargs)
-    mock.Entry = MockEntry
-    mock.Scrollbar = lambda *args, **kwargs: MockScrollbar(*args, **kwargs)
-    mock.Text = lambda *args, **kwargs: MockText(*args, **kwargs)  # Use MockText
-    mock.StringVar = MockStringVar
-    
-    # Constants
-    mock.END = 'end'
-    mock.BOTH = 'both'
-    mock.X = 'x'
-    mock.Y = 'y'
-    mock.LEFT = 'left'
-    mock.RIGHT = 'right'
-    mock.TOP = 'top'
-    mock.BOTTOM = 'bottom'
-    mock.NSEW = 'nsew'
-    return mock
+    """Mock Tk and ttk to avoid actual window creation."""
+    with patch('tkinter.Tk') as mock_tk, \
+         patch('tkinter.ttk.Notebook') as mock_notebook, \
+         patch('tkinter.ttk.Frame') as mock_frame:
+        
+        # Add after_cancel method to mock
+        mock_tk.after_cancel = MagicMock()
+        mock_tk.after = MagicMock()
+        
+        yield {
+            'tk': mock_tk,
+            'notebook': mock_notebook,
+            'frame': mock_frame
+        }
 
 @pytest.fixture
 def root(monkeypatch, mock_tk, mock_ttk):
     """Create a mock root window for testing."""
     # Mock tkinter internals
-    monkeypatch.setattr('tkinter.Tk', mock_tk.Tk)
+    monkeypatch.setattr('tkinter.Tk', mock_tk['tk'])
     monkeypatch.setattr('tkinter.ttk', mock_ttk)
     monkeypatch.setattr('tkinter._default_root', None)
     monkeypatch.setattr('tkinter._support_default_root', True)
-    monkeypatch.setattr('tkinter.StringVar', mock_tk.StringVar)
+    monkeypatch.setattr('tkinter.StringVar', mock_tk['tk'].StringVar)
     monkeypatch.setattr('tkinter.messagebox.Message', MagicMock())
     
     # Create root and set as default
-    root = mock_tk.Tk()
+    root = mock_tk['tk']
     monkeypatch.setattr('tkinter._default_root', root)
     return root
 
@@ -359,7 +380,7 @@ def app(root, monkeypatch, mock_ttk):
     # Mock ttk.Style before creating app
     monkeypatch.setattr('tkinter.ttk.Style', mock_ttk.Style)
     
-    from stock_monitor.gui.main_window import StockMonitorGUI
+    from reup.gui.main_window import StockMonitorGUI
     with patch('tkinter._get_default_root', return_value=root):
         app = StockMonitorGUI(root)
     return app 
@@ -403,3 +424,14 @@ def mock_profile():
             {'url': 'https://example.com/product/2'}
         ]
     } 
+
+@pytest.fixture(autouse=True)
+def debug_test_failure(request):
+    """Print extra info on test failures."""
+    yield
+    if request.session.testsfailed:
+        print("\nTest failed! Current test:", request.node.name)
+        print("Function:", request.function.__name__)
+        print("File:", request.fspath)
+        if hasattr(request.node, 'rep_call'):
+            print("Error:", request.node.rep_call.longrepr) 

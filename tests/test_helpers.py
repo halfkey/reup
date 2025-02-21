@@ -1,4 +1,4 @@
-from stock_monitor.core.base_monitor import BaseMonitor
+from reup.core.base_monitor import BaseMonitor
 
 class TestMonitor(BaseMonitor):
     """Concrete implementation of BaseMonitor for testing."""

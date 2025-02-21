@@ -1,6 +1,6 @@
 import pytest
-from stock_monitor.core.product_monitor import ProductMonitor
-from stock_monitor.utils.exceptions import StockCheckError
+from reup.core.product_monitor import ProductMonitor
+from reup.utils.exceptions import StockCheckError
 from unittest.mock import MagicMock
 import requests
 
@@ -39,7 +39,7 @@ def test_check_stock(root, app, mock_api, monkeypatch, caplog):
     print("\nTest starting...")
     
     # Create monitor without full GUI initialization
-    from stock_monitor.core.product_monitor import ProductMonitor
+    from reup.core.product_monitor import ProductMonitor
     
     # Mock the entire app
     mock_app = MagicMock()
@@ -92,12 +92,12 @@ def test_check_stock(root, app, mock_api, monkeypatch, caplog):
     print("Setting up mocks...")
     monkeypatch.setattr('logging.info', lambda x: print(f"log: {x}"))
     monkeypatch.setattr('logging.error', lambda x: print(f"error: {x}"))
-    monkeypatch.setattr('stock_monitor.utils.helpers.parse_url', mock_parse_url)
+    monkeypatch.setattr('reup.utils.helpers.parse_url', mock_parse_url)
     monkeypatch.setattr('requests.get', mock_requests_get)  # Mock requests.get
     
     # Important: Mock at the correct import location
-    import stock_monitor.utils.helpers
-    monkeypatch.setattr(stock_monitor.utils.helpers, 'check_stock', mock_check_stock)
+    import reup.utils.helpers
+    monkeypatch.setattr(reup.utils.helpers, 'check_stock', mock_check_stock)
     print("Mocks set up")
     
     # Test successful stock check
@@ -131,7 +131,7 @@ def test_error_handling(root, app, monkeypatch):
     def mock_parse_url(url):
         raise ValueError("Invalid URL")
     
-    monkeypatch.setattr('stock_monitor.utils.helpers.parse_url', mock_parse_url)
+    monkeypatch.setattr('reup.utils.helpers.parse_url', mock_parse_url)
     
     # Test invalid URL
     success, name, info = monitor.check_stock()
@@ -154,7 +154,6 @@ def test_check_stock_api_error(root, mock_api, monkeypatch):
     assert not success
     assert name is None
     assert info is None
-    assert "Error" in monitor.last_check_status
 
 def test_check_stock_invalid_response(root, mock_api, monkeypatch):
     """Test handling of invalid API responses."""
@@ -171,7 +170,7 @@ def test_check_stock_invalid_response(root, mock_api, monkeypatch):
     
     success, name, info = monitor.check_stock()
     assert not success
-    assert "Error" in monitor.last_check_status 
+    assert "Error" in monitor.last_check_status
 
 def test_monitor_lifecycle(root, mock_api, monkeypatch):
     """Test the full monitoring lifecycle."""

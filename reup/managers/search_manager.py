@@ -49,9 +49,9 @@ class SearchManager:
             
             return results
             
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logging.error(f"Search error: {str(e)}")
-            raise APIError(500, f"Best Buy search error: {str(e)}")
+            raise APIError(f"Best Buy search error: {str(e)}")
     
     def format_search_results(self, results: List[Dict]) -> List[Dict]:
         """Format search results for display."""

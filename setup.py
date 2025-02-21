@@ -17,6 +17,17 @@ setup(
             "reup=reup.run:main",
         ],
     },
+    extras_require={
+        'test': [
+            'pytest>=6.0',
+            'pytest-cov',
+            'pytest-timeout',
+            'pytest-mock',
+            'pytest-asyncio',
+            'black',
+            'flake8'
+        ]
+    },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: End Users/Desktop",

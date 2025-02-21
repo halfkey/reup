@@ -6,6 +6,8 @@ from ..utils.exceptions import ProfileLoadError, ProfileSaveError, ValidationErr
 from ..utils.helpers import get_timestamp
 import re
 from ..utils.logger import log_security_event
+from datetime import datetime
+from ..config.constants import DEFAULT_INTERVAL
 
 class ProfileManager:
     MAX_PROFILE_NAME_LENGTH = 50
@@ -42,6 +44,7 @@ class ProfileManager:
         if not isinstance(data, dict):
             raise ValidationError("Profile data must be a dictionary")
             
+        # Validate products
         products = data.get('products', [])
         if not isinstance(products, list):
             raise ValidationError("Products must be a list")
@@ -49,12 +52,24 @@ class ProfileManager:
         if len(products) > self.MAX_PRODUCTS_PER_PROFILE:
             raise ValidationError(f"Profile cannot contain more than {self.MAX_PRODUCTS_PER_PROFILE} products")
             
-        # Validate each product URL
-        for url in products:
-            if not isinstance(url, str):
+        # Validate each product entry
+        for product in products:
+            if not isinstance(product, dict):
+                raise ValidationError("Each product must be a dictionary")
+            
+            if 'url' not in product:
+                raise ValidationError("Each product must have a URL")
+            
+            if not isinstance(product['url'], str):
                 raise ValidationError("Product URLs must be strings")
-            if not url.startswith(('http://', 'https://')):
-                raise ValidationError("Invalid product URL")
+            
+        # Validate interval
+        interval = data.get('interval')
+        if interval is not None:
+            if not isinstance(interval, (int, float)):
+                raise ValidationError("Interval must be a number")
+            if interval < 0:
+                raise ValidationError("Interval cannot be negative")
 
     def list_profiles(self) -> list:
         """Get list of profile names."""
@@ -76,35 +91,28 @@ class ProfileManager:
             name = self._validate_profile_name(name)
             self._validate_profile_data(data)
             
-            log_security_event("PROFILE_SAVE", f"Attempting to save profile: {name}")
-            
-            # Create secure file path
-            filepath = self.profiles_dir / f"{name}.json"
-            
-            # Add metadata
-            safe_data = {
-                'products': data.get('products', []),
+            # Prepare data for saving
+            save_data = {
                 'metadata': {
                     'name': name,
-                    'last_modified': get_timestamp(),
-                    'version': '1.0'
-                }
+                    'version': '1.0',
+                    'last_modified': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                },
+                'products': data['products'],
+                'interval': data.get('interval', DEFAULT_INTERVAL)  # Use default if not provided
             }
             
-            # Write file with secure permissions
-            with open(filepath, 'w') as f:
-                json.dump(safe_data, f, indent=4)
-            os.chmod(filepath, 0o600)  # Set file permissions to 600 (rw-------)
+            # Save to file
+            file_path = self.profiles_dir / f"{name}.json"
+            with open(file_path, 'w') as f:
+                json.dump(save_data, f, indent=4)
             
-            log_security_event("PROFILE_SAVE", f"Successfully saved profile: {name}")
+            logging.info(f"Successfully saved profile: {name}")
             return True
             
-        except ValidationError as e:
-            log_security_event("PROFILE_VALIDATION", f"Failed to validate profile {name}: {str(e)}", "WARNING")
-            raise
         except Exception as e:
-            log_security_event("PROFILE_ERROR", f"Failed to save profile {name}: {str(e)}", "ERROR")
-            raise ProfileSaveError("Failed to save profile")
+            logging.error(f"Failed to save profile {name}: {str(e)}")
+            return False
     
     def load_profile(self, name: str) -> dict:
         """Load profile data from file."""
@@ -114,7 +122,13 @@ class ProfileManager:
                 raise ProfileLoadError(f"Profile not found: {name}")
             
             with open(filepath, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                
+            # Ensure interval is present in loaded data
+            if 'interval' not in data:
+                data['interval'] = DEFAULT_INTERVAL
+                
+            return data
                 
         except Exception as e:
             logging.error(f"Failed to load profile: {str(e)}")

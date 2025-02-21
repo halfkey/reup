@@ -2,11 +2,11 @@ import pytest
 from unittest.mock import MagicMock, patch
 import tkinter as tk
 from tkinter import ttk
-from stock_monitor.core.product_monitor import ProductMonitor
-from stock_monitor.utils.exceptions import APIError, URLError
-from stock_monitor.config.constants import MIN_INTERVAL
-from stock_monitor.utils.helpers import get_timestamp
-from stock_monitor.core.base_monitor import BaseMonitor
+from reup.core.product_monitor import ProductMonitor
+from reup.utils.exceptions import APIError, URLError
+from reup.config.constants import MIN_INTERVAL, DEFAULT_INTERVAL
+from reup.utils.helpers import get_timestamp
+from reup.core.base_monitor import BaseMonitor
 
 # ===== Fixtures =====
 @pytest.fixture
@@ -33,7 +33,7 @@ def mock_parent():
 def monitor(mock_tk, mock_parent):
     """Create a monitor instance with mocked components."""
     url = "https://www.bestbuy.ca/en-ca/product/12345"
-    with patch('stock_monitor.core.product_monitor.ProductMonitor.setup_ui'):
+    with patch('reup.core.product_monitor.ProductMonitor.setup_ui'):
         monitor = ProductMonitor(mock_tk['notebook'], url, mock_parent)
         # Add tkinter-specific mocks
         monitor.tk = mock_tk['tk']
@@ -69,7 +69,7 @@ class TestBasicFunctionality:
 
     def test_check_stock(self, monitor):
         """Test stock checking functionality."""
-        with patch('stock_monitor.core.product_monitor.ProductMonitor.check_stock') as mock_check:
+        with patch('reup.core.product_monitor.ProductMonitor.check_stock') as mock_check:
             # Test successful check
             mock_check.return_value = (True, "Test Product", {
                 'name': 'Test Product',
@@ -92,16 +92,21 @@ class TestBasicFunctionality:
 
     def test_validate_interval(self, monitor):
         """Test interval validation including edge cases."""
-        # Test valid interval
-        monitor.interval_entry.get.return_value = "15"
-        assert monitor.validate_interval() == 15
-
-        # Test invalid intervals
-        invalid_intervals = ["", "  ", "15.5", "-15", "abc", "0", "-1"]
-        for interval in invalid_intervals:
+        test_cases = [
+            ("15", 15),  # Valid interval
+            ("", DEFAULT_INTERVAL),  # Empty string
+            ("  ", DEFAULT_INTERVAL),  # Whitespace
+            ("15.5", DEFAULT_INTERVAL),  # Non-integer
+            ("-15", MIN_INTERVAL),  # Negative
+            ("abc", DEFAULT_INTERVAL),  # Invalid
+            ("0", MIN_INTERVAL),  # Zero
+            ("2", MIN_INTERVAL),  # Below minimum
+            ("100", 100)  # Above minimum
+        ]
+        
+        for interval, expected in test_cases:
             monitor.interval_entry.get.return_value = interval
-            with pytest.raises(ValueError):
-                monitor.validate_interval()
+            assert monitor.validate_interval() == expected, f"Failed for input: {interval}"
 
 class TestUIInteractions:
     """Tests for UI updates and user interactions"""
@@ -170,7 +175,7 @@ class TestUIInteractions:
     def test_log_message(self, monitor):
         """Test logging functionality."""
         timestamp = "2024-02-20 12:00:00"
-        with patch('stock_monitor.core.base_monitor.get_timestamp', return_value=timestamp):
+        with patch('reup.core.base_monitor.get_timestamp', return_value=timestamp):
             test_message = "Test message"
             expected_log = f"{timestamp} {test_message}\n"
             monitor.log_message(test_message)
@@ -182,16 +187,23 @@ class TestLifecycle:
     """Tests for monitoring lifecycle (start/stop/pause)"""
     def test_monitor_product_lifecycle(self, monitor):
         """Test the full monitoring lifecycle including pause/resume."""
+        # Mock all required components
         monitor.validate_interval = MagicMock(return_value=15)
         monitor.check_stock = MagicMock(return_value=(True, "Test", {}))
         monitor.handle_stock_status = MagicMock()
         monitor.after = MagicMock()
         monitor.pause_button = MagicMock()
+        monitor.start_button = MagicMock()  # Add this mock
+        monitor.log_message = MagicMock()  # Add this mock
         
         # Test start monitoring
         monitor.start_monitoring()
         assert monitor.check_stock.call_count == 1
         assert not monitor.paused
+        monitor.start_button.config.assert_called_with(
+            text="⏹ Stop", 
+            command=monitor.stop_monitoring
+        )
         
         # Test pause/resume
         monitor.paused = True
@@ -230,21 +242,22 @@ class TestErrorHandling:
     """Tests for error conditions and recovery"""
     def test_api_errors(self, monitor):
         """Test handling of API errors."""
-        error = APIError(404, "Not found")
+        error = APIError("Not found")
+        monitor.check_stock = MagicMock(side_effect=error)
         monitor.log_message = MagicMock()
         monitor.handle_monitoring_error(error)
-        monitor.log_message.assert_called_with("❌ Error monitoring: API Error (404): Not found")
+        monitor.log_message.assert_called_with("❌ Error monitoring: Not found")
 
     def test_monitoring_errors(self, monitor):
-        """Test comprehensive error handling."""
+        """Test handling of monitoring errors."""
         monitor.validate_interval = MagicMock(return_value=15)
-        monitor.check_stock = MagicMock(side_effect=APIError(500, "Server error"))
+        monitor.check_stock = MagicMock(side_effect=APIError("Server error"))
         monitor.after = MagicMock()
         monitor.log_message = MagicMock()
         
         monitor.monitor_product()
         monitor.log_message.assert_called_with(
-            "❌ Error monitoring: API Error (500): Server error"
+            "❌ Error monitoring: Server error"
         )
         monitor.after.assert_called_once_with(15000, monitor.monitor_product)
         assert monitor.status['error_count'] == 1

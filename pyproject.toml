@@ -32,4 +32,17 @@ markers = [
 ]
 testpaths = ["tests"]
 python_files = "test_*.py"
-addopts = "-v --tb=short --cov=reup --cov-report=term-missing" 
+addopts = "-v --tb=short --cov=reup --cov-report=term-missing"
+timeout = 30  # Timeout after 30 seconds
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=reup --cov-report=term-missing"
+asyncio_mode = "strict"
+timeout = 30 

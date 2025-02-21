@@ -9,12 +9,13 @@ from ..utils.exceptions import StockCheckError, APIError, URLError
 from plyer import notification
 
 class ProductMonitor(BaseMonitor):
-    def __init__(self, notebook, url, parent):
+    def __init__(self, notebook, url, parent, test_mode=False):
         # Pass both notebook and parent as main_app to BaseMonitor
         super().__init__(notebook, parent)  # parent will serve as main_app
         self.notebook = notebook
         self.url = url
         self.parent = parent
+        self.test_mode = test_mode
         self.scheduled_check = None
         self.paused = False
         
@@ -147,17 +148,25 @@ class ProductMonitor(BaseMonitor):
             self.use_default_interval()
             self.monitor_product()
 
-    def validate_interval(self):
-        """Validate the interval value."""
+    def validate_interval(self) -> int:
+        """Validate and return the check interval in seconds.
+        
+        Returns:
+            int: The validated interval in seconds, using defaults for invalid input
+        """
         try:
-            interval = int(self.interval_entry.get())
-            if interval < MIN_INTERVAL:
-                raise ValueError(f"Interval must be at least {MIN_INTERVAL} seconds")
-            return interval
-        except ValueError as e:
-            if "invalid literal" in str(e):
-                raise ValueError("Invalid interval")
-            raise
+            interval_str = self.interval_entry.get().strip()
+            if not interval_str:
+                return DEFAULT_INTERVAL
+            
+            interval = int(interval_str)
+            if interval <= 0:
+                return MIN_INTERVAL
+            
+            return max(interval, MIN_INTERVAL)
+        
+        except ValueError:
+            return DEFAULT_INTERVAL
 
     def use_default_interval(self):
         """Reset to default interval."""
@@ -326,20 +335,49 @@ class ProductMonitor(BaseMonitor):
             self.log_message(f"⚠️ Could not send notification: {str(e)}")
 
     def check_stock(self):
-        """Check stock status for the product."""
+        """Check stock status for the product.
+        
+        Returns:
+            tuple: (success, name, info) where:
+                - success (bool): Whether the check was successful
+                - name (str): Product name or None if check failed
+                - info (dict): Product info or None if check failed
+        """
         try:
             print(f"Checking stock for URL: {self.url}")
             from ..utils.helpers import check_stock, parse_url
             
             product_id = parse_url(self.url)
-            print(f"Parsed product ID: {product_id}")
-            
             success, name, info = check_stock(product_id)
-            print(f"Stock check result: {success}, {name}, {info}")
+            
+            # Update status based on success and validity
+            if success:
+                self.last_check_status = "In Stock"
+            elif info and 'error' in info:
+                self.last_check_status = f"Error: {info['error']}"
+            else:
+                self.last_check_status = "Error: Invalid response"
+            
+            self.update_status({'status': self.last_check_status})
+            
+            # If check_stock returned error info, convert to None
+            if not success and isinstance(info, dict) and 'error' in info:
+                info = None
             
             return success, name, info
             
+        except ValueError as e:
+            # Handle invalid URL or parsing errors
+            error_msg = str(e)
+            self.last_check_status = f"Error: {error_msg}"
+            self.update_status({'status': self.last_check_status})
+            self.log_error(error_msg)
+            return False, None, None
+            
         except Exception as e:
-            print(f"Error in check_stock: {str(e)}")
-            self.log_error(str(e))
-            raise  # Re-raise to be handled by monitor_product 
+            # Handle other errors
+            error_msg = f"Error checking stock: {str(e)}"
+            self.last_check_status = "Error"
+            self.update_status({'status': self.last_check_status})
+            self.log_error(error_msg)
+            return False, None, None 

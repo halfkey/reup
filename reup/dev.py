@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 import tkinter as tk
 from importlib import reload
-from reup.gui.main_window import StockMonitorGUI
+from .gui.main_window import StockMonitorGUI
 
 def reload_modules():
     """Reload all project modules."""

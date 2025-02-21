@@ -1,3 +1,5 @@
+"""Main GUI application for stock monitoring."""
+
 from typing import Dict, Optional, List
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
@@ -13,14 +15,19 @@ import logging
 from datetime import datetime
 import requests
 from pathlib import Path
+from reup.managers.profile_handler import ProfileHandler
 
 class StockMonitorGUI:
     """Main GUI application for stock monitoring."""
     
-    def __init__(self):
-        """Initialize the main window."""
-        self.root = tk.Tk()
-        self.root.title("Reup")  # Changed from "Stock Monitor" to "Reup"
+    def __init__(self, root=None):
+        """Initialize the main window.
+        
+        Args:
+            root: Optional tkinter root window. If None, creates a new one.
+        """
+        self.root = root if root is not None else tk.Tk()
+        self.root.title("Reup")
         
         # Set window size
         self.root.geometry(f"{WINDOW_SIZE[0]}x{WINDOW_SIZE[1]}")
@@ -35,6 +42,8 @@ class StockMonitorGUI:
         
         # Bind window close event
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        self.profile_handler = ProfileHandler()
         
     def setup_root_window(self):
         """Configure the root window."""
@@ -283,8 +292,7 @@ class StockMonitorGUI:
                     'url': values[1]
                 })
             
-            # Save profile
-            self.profile_manager.save_profile(profile_name, {'products': products})
+            self.profile_handler.save_profile(profile_name, {'products': products})
             
             # Update profile list
             self.update_profile_list()
@@ -528,7 +536,7 @@ class StockMonitorGUI:
         """Configure logging."""
         log_dir = Path(__file__).parent.parent.parent / 'data' / 'logs'
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / 'stock_monitor.log'
+        log_file = log_dir / 'reup.log'
         
         logging.basicConfig(
             filename=str(log_file),
@@ -822,22 +830,25 @@ class StockMonitorGUI:
             self.handle_error(e, "Stop Monitoring Error")
 
     def save_profile(self):
-        """Save current monitoring profile."""
+        """Save current configuration to a profile."""
         profile_name = self.profile_var.get()
         if not profile_name:
             return
-        
-        # Get products from tree
-        products = []
-        for item in self.product_tree.get_children():
-            values = self.product_tree.item(item)['values']
-            products.append({
-                'name': values[0],
-                'url': values[1]
-            })
-        
-        # Save profile
-        self.profile_manager.save_profile(profile_name, {'products': products})
+            
+        try:
+            # Get products from tree
+            products = []
+            for item in self.product_tree.get_children():
+                values = self.product_tree.item(item)['values']
+                products.append({
+                    'name': values[0],
+                    'url': values[1]
+                })
+            
+            self.profile_handler.save_profile(profile_name, {'products': products})
+            
+        except Exception as e:
+            self.handle_error(e)
 
     def load_profile(self):
         """Load selected profile."""
@@ -846,9 +857,13 @@ class StockMonitorGUI:
             return
         
         try:
-            profile = self.profile_manager.load_profile(profile_name)
-            self.clear_product_tree()  # Changed from clear_products
+            # Load profile data
+            profile = self.profile_handler.load_profile(profile_name)
             
+            # Clear existing products
+            self.clear_product_tree()
+            
+            # Add products from profile
             for product in profile['products']:
                 self.add_product_to_monitor(product['url'])
             

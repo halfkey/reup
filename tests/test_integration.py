@@ -1,6 +1,6 @@
 import pytest
 import tkinter as tk
-from stock_monitor.gui.main_window import StockMonitorGUI
+from reup.gui.main_window import StockMonitorGUI
 from unittest.mock import MagicMock
 import time
 

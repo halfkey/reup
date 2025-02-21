@@ -12,7 +12,7 @@ class ChangeHandler(FileSystemEventHandler):
         if self.process:
             self.process.terminate()
             self.process.wait()
-        self.process = subprocess.Popen(['python', '-m', 'stock_monitor.dev'])
+        self.process = subprocess.Popen(['python', '-m', 'reup.dev'])
 
     def on_modified(self, event):
         if event.src_path.endswith('.py'):
@@ -22,7 +22,7 @@ class ChangeHandler(FileSystemEventHandler):
 if __name__ == "__main__":
     handler = ChangeHandler()
     observer = Observer()
-    observer.schedule(handler, 'stock_monitor', recursive=True)
+    observer.schedule(handler, 'reup', recursive=True)
     observer.start()
 
     try:

@@ -10,7 +10,7 @@ def run_tests():
     args = [
         str(project_root / "tests"),
         "-v",
-        "--cov=stock_monitor",
+        "--cov=reup",
         "--cov-report=term-missing",
     ]
     

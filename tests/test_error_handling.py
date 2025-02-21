@@ -1,8 +1,8 @@
 import pytest
-from stock_monitor.utils.exceptions import APIError, URLError
+from reup.utils.exceptions import APIError, URLError
 import requests
 from unittest.mock import MagicMock
-from stock_monitor.core.product_monitor import ProductMonitor
+from reup.core.product_monitor import ProductMonitor
 
 def test_api_errors(root, app, monkeypatch):
     """Test handling of API errors."""

@@ -8,20 +8,20 @@ def cleanup_project():
     
     # Files to remove (old/duplicate files)
     files_to_remove = [
-        'monitor_tab.py',  # Should be in stock_monitor/gui/
-        'profile_manager.py',  # Duplicate, should be in stock_monitor/managers/
-        'run.py',  # Duplicate, should be in stock_monitor/
-        'config.py',  # Old file, now in stock_monitor/config/
+        'monitor_tab.py',  # Should be in reup/gui/
+        'profile_manager.py',  # Duplicate, should be in reup/managers/
+        'run.py',  # Duplicate, should be in reup/
+        'config.py',  # Old file, now in reup/config/
         'src/gui/__init__ copy.py',
         'src/gui/__init__.py',
     ]
     
     # Directories to remove
     dirs_to_remove = [
-        'src',  # Everything moved to stock_monitor/
+        'src',  # Everything moved to reup/
         '__pycache__',
         '.pytest_cache',
-        'stock_monitor.egg-info',  # Can be regenerated
+        'reup.egg-info',  # Can be regenerated
     ]
     
     # Clean up specific files

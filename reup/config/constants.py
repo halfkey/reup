@@ -10,7 +10,7 @@ STORES = {
 
 # Intervals
 DEFAULT_INTERVAL = 15
-MIN_INTERVAL = 10
+MIN_INTERVAL = 5
 
 # Window size
 WINDOW_SIZE = (1200, 800)
@@ -22,4 +22,7 @@ REQUEST_HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5',
     'Connection': 'keep-alive',
-} 
+}
+
+# API endpoints
+API_URL = "https://www.bestbuy.ca/api/v2/json/product" 

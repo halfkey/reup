@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 import tkinter as tk
 from tkinter import ttk
-from stock_monitor.core.base_monitor import BaseMonitor
+from reup.core.base_monitor import BaseMonitor
 from tests.test_helpers import TestMonitor  # Changed from relative to absolute import
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def test_log_message(base_monitor):
     timestamp = "2024-02-20 12:00:00"
     
     # Test with log_display
-    with patch('stock_monitor.core.base_monitor.get_timestamp', return_value=timestamp):
+    with patch('reup.core.base_monitor.get_timestamp', return_value=timestamp):
         base_monitor.log_message(test_message)
         
         expected_log = f"{timestamp} {test_message}\n"
@@ -81,7 +81,7 @@ def test_log_message(base_monitor):
     base_monitor.log_display = None
     base_monitor.parent.log_message.reset_mock()
     
-    with patch('stock_monitor.core.base_monitor.get_timestamp', return_value=timestamp):
+    with patch('reup.core.base_monitor.get_timestamp', return_value=timestamp):
         base_monitor.log_message(test_message)
         base_monitor.parent.log_message.assert_called_once_with(test_message)
 

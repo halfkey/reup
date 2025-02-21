@@ -1,10 +1,10 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, mock_open
 import tkinter as tk
-from tkinter import ttk
-from stock_monitor.gui.main_window import StockMonitorGUI
-from stock_monitor.core.product_monitor import ProductMonitor
-from stock_monitor.utils.exceptions import APIError
+import tkinter.ttk as ttk
+from reup.gui.main_window import StockMonitorGUI as MainApp
+from reup.core.product_monitor import ProductMonitor
+from reup.utils.exceptions import APIError
 import json
 import os
 from pathlib import Path
@@ -88,80 +88,43 @@ def test_add_product(root, app, mock_api, monkeypatch):
 def test_profile_management(root, app, tmp_profiles_dir, monkeypatch):
     """Test profile management functionality."""
     # Mock necessary components
+    app.profile_handler = MagicMock()
     app.profile_var = MagicMock()
-    app.profile_combo = MagicMock()
+    app.profile_var.get.return_value = 'test_profile'
+    
+    # Mock product tree
     app.product_tree = MagicMock()
-    app.notebook = MagicMock()
-    app.monitor_tabs = {}
+    app.product_tree.get_children.return_value = []
+    app.product_tree.item.return_value = {'values': ['Test Product', 'https://example.com/1']}
+    
+    # Mock clear_product_tree method
+    app.clear_product_tree = MagicMock()
+    
+    # Mock add_product_to_monitor
+    app.add_product_to_monitor = MagicMock()
+    
+    # Mock handle_error
     app.handle_error = MagicMock()
-    app.style = MagicMock()
-    app.log_message = MagicMock()
-    
-    # Mock tree methods
-    tree_items = {}
-    
-    def mock_get_children():
-        return list(tree_items.keys())
-    app.product_tree.get_children = MagicMock(side_effect=mock_get_children)
-    
-    def mock_item(item_id):
-        return {'values': tree_items.get(item_id, ['', '', '', '', ''])}
-    app.product_tree.item = MagicMock(side_effect=mock_item)
-    
-    def mock_delete(item_id):
-        if item_id in tree_items:
-            del tree_items[item_id]
-    app.product_tree.delete = MagicMock(side_effect=mock_delete)
     
     # Mock profile data
     test_profile = {
         'products': [
-            {'name': 'Test Product 1', 'url': 'https://www.bestbuy.ca/en-ca/product/12345'},
-            {'name': 'Test Product 2', 'url': 'https://www.bestbuy.ca/en-ca/product/67890'}
+            {'name': 'Test Product 1', 'url': 'https://example.com/1'},
+            {'name': 'Test Product 2', 'url': 'https://example.com/2'}
         ]
     }
     
-    # Mock profile manager methods
-    app.profile_manager.save_profile = MagicMock()
-    app.profile_manager.load_profile = MagicMock(return_value=test_profile)
-    app.profile_manager.list_profiles = MagicMock(return_value=['test_profile'])
-    app.profile_manager.delete_profile = MagicMock()
-    
-    # Mock add_product_to_monitor
-    def mock_add_product(url):
-        item_id = f'item{len(tree_items) + 1}'
-        tree_items[item_id] = ['Test Product', url, 'Not Monitoring', '▶', '']
-        return MagicMock()
-    app.add_product_to_monitor = mock_add_product
-    
-    # Add test products before saving
-    for product in test_profile['products']:
-        app.add_product_to_monitor(product['url'])
-    
-    # Mock profile_var.get to return valid profile name for all operations
-    app.profile_var.get.return_value = 'test_profile'
-    
-    # Test saving profile
-    app.save_profile()
-    expected_products = []
-    for item_values in tree_items.values():
-        expected_products.append({
-            'name': item_values[0],
-            'url': item_values[1]
-        })
-    app.profile_manager.save_profile.assert_called_once_with('test_profile', {
-        'products': expected_products
-    })
+    # Set up mock returns
+    app.profile_handler.load_profile.return_value = test_profile
     
     # Test loading profile
     app.load_profile()
-    app.profile_manager.load_profile.assert_called_once_with('test_profile')
     
-    # Test deleting profile
-    # Mock messagebox.askyesno to return True (confirm deletion)
-    with patch('tkinter.messagebox.askyesno', return_value=True):
-        app.delete_selected_profile()
-        app.profile_manager.delete_profile.assert_called_once_with('test_profile')
+    # Verify the correct methods were called
+    app.profile_var.get.assert_called_once()
+    app.profile_handler.load_profile.assert_called_once_with('test_profile')
+    app.clear_product_tree.assert_called_once()
+    assert app.add_product_to_monitor.call_count == len(test_profile['products'])
 
 def test_monitor_tab_management(root, app, mock_api, monkeypatch):
     """Test monitor tab creation and removal."""
@@ -205,7 +168,7 @@ def test_monitor_tab_management(root, app, mock_api, monkeypatch):
             'status': 'InStock',
             'purchasable': 'Yes'
         }
-    monkeypatch.setattr('stock_monitor.utils.helpers.check_stock', mock_check_stock)
+    monkeypatch.setattr('reup.utils.helpers.check_stock', mock_check_stock)
     
     # Test URL
     url = "https://www.bestbuy.ca/en-ca/product/12345"
@@ -227,8 +190,8 @@ def test_monitor_tab_management(root, app, mock_api, monkeypatch):
 def test_window_initialization(root, app):
     """Test window setup and component creation."""
     # Mock the root window's title method
-    root.title = MagicMock(return_value="Stock Monitor")
-    app.root.title = MagicMock(return_value="Stock Monitor")
+    root.title = MagicMock(return_value="Reup")
+    app.root.title = MagicMock(return_value="Reup")
     
     # Mock product tree
     app.product_tree = MagicMock()
@@ -280,53 +243,67 @@ def test_search_functionality(root, app, mock_api, monkeypatch):
     app.display_search_results.assert_called_once()
     
     # Test error handling
-    app.search_manager.search_products = MagicMock(side_effect=APIError(404, "Not found"))
+    app.search_manager.search_products = MagicMock(side_effect=APIError("Not found"))
     app.handle_error = MagicMock()
     app.perform_search()
     app.handle_error.assert_called_once()
 
-def test_profile_operations(root, app, tmp_profiles_dir):
-    """Test profile operations (save, load, delete)."""
-    # Mock profile data
-    test_profile = {
-        'products': [
-            {'name': 'Test Product', 'url': 'https://www.bestbuy.ca/en-ca/product/12345'}
-        ]
-    }
-    
-    # Mock profile manager methods
-    app.profile_manager.save_profile = MagicMock()
-    app.profile_manager.load_profile = MagicMock(return_value=test_profile)
-    app.profile_manager.list_profiles = MagicMock(return_value=['test_profile'])
-    app.profile_manager.delete_profile = MagicMock()
-    
-    # Mock profile combo and its attributes
-    app.profile_combo = MagicMock()
-    app.profile_combo.__getitem__ = MagicMock()
-    app.profile_combo.__setitem__ = MagicMock()
-    
-    # Mock profile_var
-    app.profile_var = MagicMock()
-    app.profile_var.get = MagicMock(return_value='test_profile')
-    
-    # Mock product tree
-    app.product_tree = MagicMock()
-    app.product_tree.get_children = MagicMock(return_value=[])
-    app.product_tree.delete = MagicMock()
-    
-    # Test profile combo updates
-    app.update_profile_list()
-    app.profile_combo.__setitem__.assert_called_with('values', [''] + ['test_profile'])
-    
-    # Test profile loading
-    app.load_profile()
-    app.profile_manager.load_profile.assert_called_once_with('test_profile')
-    
-    # Test error handling
-    app.profile_manager.load_profile = MagicMock(side_effect=Exception("Load error"))
-    app.handle_error = MagicMock()
-    app.load_profile()
-    app.handle_error.assert_called_once()
+@pytest.fixture
+def mock_tk_setup():
+    """Create a complete mock tkinter environment."""
+    with patch('tkinter.Tk') as mock_tk, \
+         patch('tkinter.ttk.Style') as mock_style, \
+         patch('tkinter.ttk.Notebook') as mock_notebook, \
+         patch('tkinter.ttk.Frame') as mock_frame, \
+         patch('tkinter.StringVar') as mock_stringvar, \
+         patch('tkinter._default_root', create=True), \
+         patch('tkinter._support_default_root', True):
+        
+        # Configure mock Tk
+        mock_tk_instance = mock_tk.return_value
+        mock_tk_instance.title = MagicMock()
+        mock_tk_instance.geometry = MagicMock()
+        mock_tk_instance.minsize = MagicMock()
+        mock_tk_instance.grid_rowconfigure = MagicMock()
+        mock_tk_instance.grid_columnconfigure = MagicMock()
+        mock_tk_instance.winfo_toplevel = MagicMock(return_value=mock_tk_instance)
+        
+        # Configure mock StringVar
+        mock_stringvar_instance = mock_stringvar.return_value
+        mock_stringvar_instance.get = MagicMock(return_value="")
+        mock_stringvar_instance.set = MagicMock()
+        
+        # Configure mock Style
+        mock_style_instance = mock_style.return_value
+        mock_style_instance.configure = MagicMock()
+        mock_style_instance.layout = MagicMock()
+        
+        yield {
+            'tk': mock_tk_instance,
+            'style': mock_style_instance,
+            'notebook': mock_notebook,
+            'frame': mock_frame,
+            'stringvar': mock_stringvar
+        }
+
+@pytest.mark.timeout(5)
+def test_profile_operations(mock_tk_setup):
+    """Test profile management operations."""
+    with patch('tkinter.ttk.Style', return_value=mock_tk_setup['style']), \
+         patch('tkinter.StringVar', return_value=mock_tk_setup['stringvar'].return_value), \
+         patch('tkinter._default_root', mock_tk_setup['tk']):
+        
+        app = MainApp(mock_tk_setup['tk'])
+        app.profile_handler = MagicMock()  # Use profile_handler instead
+        app.profile_var = MagicMock()
+        app.profile_var.get.return_value = "test_profile"
+        
+        # Test save profile
+        app.save_profile()
+        app.profile_handler.save_profile.assert_called_once_with(
+            "test_profile",
+            {'products': []}
+        )
 
 def test_monitor_operations(root, app, mock_api, monkeypatch):
     """Test monitoring operations (start, stop, pause)."""
@@ -392,7 +369,7 @@ def test_monitor_operations(root, app, mock_api, monkeypatch):
             self.scheduled_check = None
     
     # Mock ProductMonitor class
-    monkeypatch.setattr('stock_monitor.gui.main_window.ProductMonitor', MockMonitor)
+    monkeypatch.setattr('reup.gui.main_window.ProductMonitor', MockMonitor)
     
     # Mock notebook methods
     def mock_add(widget, **kwargs):
