@@ -7,12 +7,19 @@
 - CI workflow with Python 3.8, 3.9, and 3.10 support
 - Code formatting checks with Black
 - Linting with Flake8
+- CI/CD pipeline with GitHub Actions
+- Test suite with pytest
+- Test coverage reporting
+- Basic test infrastructure and fixtures
 
 ### Changed
 - Refactored profile management from GUI to separate business logic
 - Updated GUI to use new ProfileHandler
 - Improved error handling in API calls
 - Enhanced test coverage to 36%
+- Updated project structure
+- Improved test organization
+- Updated dependencies management
 
 ### Development
 - Added GitHub Actions workflow for automated testing
