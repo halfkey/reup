@@ -8,18 +8,13 @@
 - Code formatting checks with Black
 - Linting with Flake8
 - CI/CD pipeline with GitHub Actions
-- Test suite with pytest
-- Test coverage reporting
-- Basic test infrastructure and fixtures
+- Test coverage reporting (36% coverage)
 
 ### Changed
+- Lowered initial CI coverage threshold to 35%
 - Refactored profile management from GUI to separate business logic
 - Updated GUI to use new ProfileHandler
 - Improved error handling in API calls
-- Enhanced test coverage to 36%
-- Updated project structure
-- Improved test organization
-- Updated dependencies management
 
 ### Development
 - Added GitHub Actions workflow for automated testing
@@ -27,14 +22,8 @@
 - Added code quality checks
 
 ### In Progress
-- Improving test coverage for:
-  - reup/config/config.py
-  - reup/managers/cache_manager.py
-  - reup/managers/request_manager.py
-  - reup/managers/security_manager.py
-  - reup/utils/performance.py
-  - reup/utils/profile_validator.py
-  - reup/utils/validators.py
+- Improving test coverage for uncovered modules
+- Working towards 50% coverage target
 
 ## [1.0.0] - 2024-02-20
 ### Added
