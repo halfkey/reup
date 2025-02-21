@@ -14,22 +14,22 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
 ]
 
-[tool.pytest]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-addopts = "-v --tb=short"
-markers = [
-    "timeout: mark test with timeout (pytest-timeout)"
-]
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=reup --cov-report=term-missing"
+asyncio_mode = "strict"
+asyncio_fixture_loop_scope = "function"
+timeout = 30
 log_cli = true
 log_cli_level = "INFO"
 markers = [
     "timeout: mark test to fail after given seconds",
     "integration: mark test as integration test",
     "slow: mark test as slow running"
-]
-testpaths = ["tests"]
-python_files = "test_*.py"
-addopts = "-v --tb=short --cov=reup --cov-report=term-missing" 
+] 
