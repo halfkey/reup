@@ -11,6 +11,7 @@ setup(
         "requests>=2.31.0",
         "beautifulsoup4>=4.12.0",
         "plyer>=2.1.0",
+        "pyyaml>=6.0.1",
     ],
     entry_points={
         "console_scripts": [
@@ -20,12 +21,12 @@ setup(
     extras_require={
         'test': [
             'pytest>=6.0',
-            'pytest-cov',
-            'pytest-timeout',
-            'pytest-mock',
-            'pytest-asyncio',
-            'black',
-            'flake8'
+            'pytest-cov>=4.1.0',
+            'pytest-timeout>=2.1.0',
+            'pytest-mock>=3.10.0',
+            'pytest-asyncio>=0.21.0',
+            'black>=23.0.0',
+            'flake8>=6.0.0'
         ]
     },
     classifiers=[
